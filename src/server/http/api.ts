@@ -71,14 +71,14 @@ export function route<B = undefined, Q = undefined>(
   opts: RouteOptions<B, Q>,
   handler: (ctx: RouteContext<B, Q>) => Promise<Response>,
 ) {
-  return async (req: Request, nextCtx?: NextRouteCtx): Promise<Response> => {
+  return async (req: Request, nextCtx: NextRouteCtx): Promise<Response> => {
     let user: SessionUser | null = null;
     try {
       user = await getRequestUser(req);
       if (!user) throw unauthenticated();
       if (opts.permission) assertCan(user.role, opts.permission);
 
-      const params = (await nextCtx?.params) ?? {};
+      const params = (await nextCtx?.params) ?? {}; // ctx may be omitted in tests
       const url = new URL(req.url);
       const query = opts.query ? opts.query.parse(Object.fromEntries(url.searchParams)) : (undefined as Q);
 
