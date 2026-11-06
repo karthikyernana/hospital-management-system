@@ -4,6 +4,7 @@ import { requirePermission } from "@/server/auth/current-user";
 import { can } from "@/server/auth/permissions";
 import { getPatient } from "@/server/services/patients";
 import { listAppointments } from "@/server/services/appointments";
+import { listVisits } from "@/server/services/visits";
 import { StatusBadge } from "@/components/status-badge";
 import Link from "next/link";
 import { AppError } from "@/server/http/errors";
@@ -23,6 +24,8 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
     throw e;
   });
   const appointments = await listAppointments(user, { patientId: p.id, scope: "all", page: 1, pageSize: 10 });
+  // Clinical history only for roles with visit access (front desk never receives it).
+  const visits = can(user.role, "visit:read") ? await listVisits(user, { patientId: p.id, page: 1, pageSize: 10 }) : null;
 
   const rows: [string, string | null][] = [
     ["Date of birth", `${formatLocalDate(p.dateOfBirth)} (${ageFrom(p.dateOfBirth)} y)`],
@@ -79,6 +82,25 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
               </Table>
             )}
           </Card>
+          {visits && (
+            <Card title="Visit history">
+              {visits.items.length === 0 ? (
+                <EmptyState title="No visits you can access" />
+              ) : (
+                <Table head={["Started", "Clinician", "Complaint", "Status", ""]} caption="Visit history">
+                  {visits.items.map((v) => (
+                    <tr key={v.id}>
+                      <Td className="tabular-nums">{formatLocal(v.startedAt)}</Td>
+                      <Td>Dr. {v.doctor.firstName} {v.doctor.lastName}</Td>
+                      <Td className="max-w-[180px] truncate">{v.chiefComplaint ?? "—"}</Td>
+                      <Td><StatusBadge status={v.status} /></Td>
+                      <Td><Link className="text-teal-700 hover:underline" href={`/visits/${v.id}`}>Open</Link></Td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </Card>
+          )}
         </div>
       </div>
     </>
