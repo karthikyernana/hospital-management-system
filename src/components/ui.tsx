@@ -202,13 +202,13 @@ export function Pagination({ page, pageSize, total, basePath, params }: { page: 
     return `${basePath}?${sp.toString()}`;
   };
   return (
-    <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm text-slate-600">
+    <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
       <p>
         {total === 0 ? "No results" : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`}
       </p>
       <div className="flex gap-2">
         {page > 1 ? <ButtonLink variant="secondary" href={href(page - 1)}>Previous</ButtonLink> : <span className="rounded-md px-3.5 py-2 text-slate-400">Previous</span>}
-        <span className="px-2 py-2" aria-current="page">Page {page} of {pages}</span>
+        <span className="whitespace-nowrap px-2 py-2" aria-current="page">Page {page} of {pages}</span>
         {page < pages ? <ButtonLink variant="secondary" href={href(page + 1)}>Next</ButtonLink> : <span className="rounded-md px-3.5 py-2 text-slate-400">Next</span>}
       </div>
     </nav>
