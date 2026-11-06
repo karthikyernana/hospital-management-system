@@ -75,7 +75,8 @@ async function nextInvoiceNumber(tx: Tx): Promise<string> {
 export async function listInvoices(actor: SessionUser, q: InvoiceListQuery): Promise<Paginated<InvoiceDetail>> {
   assertCan(actor.role, "billing:read");
   const where: Prisma.InvoiceWhereInput = {
-    status: q.status,
+    // Patients never see unfinished drafts.
+    status: actor.role === "PATIENT" ? (q.status && q.status !== "DRAFT" ? q.status : { not: "DRAFT" }) : q.status,
     patientId: actor.role === "PATIENT" ? (actor.patientId ?? "__none__") : q.patientId,
     ...(q.q
       ? {
@@ -99,6 +100,7 @@ export async function getInvoice(actor: SessionUser, id: string) {
   const inv = await prisma.invoice.findUnique({ where: { id }, include: invoiceInclude });
   if (!inv) throw notFound("Invoice");
   assertInvoiceScope(actor, inv);
+  if (actor.role === "PATIENT" && inv.status === "DRAFT") throw notFound("Invoice");
   await audit(actor, { action: "READ", entityType: "Invoice", entityId: id, patientId: inv.patientId });
   return { ...inv, reconciliation: reconcileInvoice(inv) };
 }
