@@ -156,17 +156,17 @@ const inputCls = cx(
 );
 
 export function Input({ error, ...props }: InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
-  return <input id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.name}-error` : undefined} {...props} className={cx(inputCls, props.className)} />;
+  return <input id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.id ?? props.name}-error` : undefined} {...props} className={cx(inputCls, props.className)} />;
 }
 export function Select({ error, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
   return (
-    <select id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.name}-error` : undefined} {...props} className={cx(inputCls, props.className)}>
+    <select id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.id ?? props.name}-error` : undefined} {...props} className={cx(inputCls, props.className)}>
       {children}
     </select>
   );
 }
 export function Textarea({ error, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { error?: string }) {
-  return <textarea id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.name}-error` : undefined} rows={3} {...props} className={cx(inputCls, props.className)} />;
+  return <textarea id={props.name} aria-invalid={!!error || undefined} aria-describedby={error ? `${props.id ?? props.name}-error` : undefined} rows={3} {...props} className={cx(inputCls, props.className)} />;
 }
 
 export function Table({ head, children, caption }: { head: ReactNode[]; children: ReactNode; caption?: string }) {
