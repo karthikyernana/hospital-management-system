@@ -1,0 +1,384 @@
+// Hospital Management System — data model
+// Money is stored as integer paise (INR * 100) to avoid floating-point drift.
+// Times are stored in UTC; the hospital operates in IST (UTC+05:30, no DST).
+// Some constraints Prisma cannot express (partial unique index, overlap
+// exclusion constraint, CHECK constraints) live in the SQL migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FRONT_DESK
+  CLINICIAN
+  PATIENT
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  UNDISCLOSED
+}
+
+enum StaffRole {
+  RECEPTIONIST
+  NURSE
+  LAB_TECHNICIAN
+  PHARMACIST
+  ADMINISTRATOR
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum EncounterStatus {
+  OPEN
+  FINALIZED
+}
+
+enum DiagnosticStatus {
+  ORDERED
+  RESULTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
+enum LineCategory {
+  CONSULTATION
+  PROCEDURE
+  LAB
+  PHARMACY
+  ROOM
+  OTHER
+}
+
+enum PaymentMethod {
+  CARD
+  UPI
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+/// Login account. Linked to at most one doctor, staff member or patient profile.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  doctor    Doctor?
+  staff     StaffMember?
+  patient   Patient?
+  auditLogs AuditLog[]
+
+  @@index([role])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  doctors Doctor[]
+  staff   StaffMember[]
+}
+
+model Doctor {
+  id                   String   @id @default(cuid())
+  userId               String?  @unique
+  departmentId         String
+  firstName            String
+  lastName             String
+  specialty            String
+  licenseNo            String   @unique
+  email                String   @unique
+  phone                String
+  /// Length of one appointment slot in minutes.
+  slotMinutes          Int      @default(30)
+  consultationFeeCents Int
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user         User?            @relation(fields: [userId], references: [id])
+  department   Department       @relation(fields: [departmentId], references: [id])
+  schedules    DoctorSchedule[]
+  appointments Appointment[]
+  encounters   Encounter[]
+
+  @@index([departmentId])
+  @@index([lastName, firstName])
+}
+
+/// Weekly recurring working window, in hospital-local minutes from midnight.
+model DoctorSchedule {
+  id          String @id @default(cuid())
+  doctorId    String
+  /// 0 = Sunday ... 6 = Saturday
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek, startMinute])
+  @@index([doctorId, dayOfWeek])
+}
+
+model StaffMember {
+  id           String    @id @default(cuid())
+  userId       String?   @unique
+  departmentId String?
+  firstName    String
+  lastName     String
+  staffRole    StaffRole
+  email        String    @unique
+  phone        String
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  user       User?       @relation(fields: [userId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@index([staffRole])
+  @@index([departmentId])
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  /// Medical record number, human-friendly unique identifier.
+  mrn              String   @unique
+  userId           String?  @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime @db.Date
+  gender           Gender
+  phone            String
+  email            String?
+  address          String?
+  bloodGroup       String?
+  emergencyContact String?
+  allergies        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+  encounters   Encounter[]
+  invoices     Invoice[]
+
+  @@index([lastName, firstName])
+  @@index([phone])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  patientId      String
+  doctorId       String
+  startTime      DateTime
+  endTime        DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  reason         String?
+  cancelReason   String?
+  /// Client-supplied key making "book" safe to retry (duplicate submits).
+  idempotencyKey String?           @unique
+  /// Optimistic-concurrency version, bumped on every state change.
+  version        Int               @default(1)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  patient   Patient    @relation(fields: [patientId], references: [id])
+  doctor    Doctor     @relation(fields: [doctorId], references: [id])
+  encounter Encounter?
+  invoice   Invoice?
+
+  @@index([doctorId, startTime])
+  @@index([patientId, startTime])
+  @@index([status, startTime])
+}
+
+/// A clinical visit. Notes/prescriptions/reports are entered by clinicians;
+/// the system never generates a diagnosis.
+model Encounter {
+  id             String          @id @default(cuid())
+  appointmentId  String?         @unique
+  patientId      String
+  doctorId       String
+  status         EncounterStatus @default(OPEN)
+  chiefComplaint String?
+  startedAt      DateTime        @default(now())
+  finalizedAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  appointment       Appointment?       @relation(fields: [appointmentId], references: [id])
+  patient           Patient            @relation(fields: [patientId], references: [id])
+  doctor            Doctor             @relation(fields: [doctorId], references: [id])
+  notes             ClinicalNote[]
+  prescriptions     Prescription[]
+  diagnosticReports DiagnosticReport[]
+  invoice           Invoice?
+
+  @@index([patientId, startedAt])
+  @@index([doctorId, startedAt])
+}
+
+model ClinicalNote {
+  id          String   @id @default(cuid())
+  encounterId String
+  authorId    String
+  body        String
+  createdAt   DateTime @default(now())
+
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId])
+}
+
+model Prescription {
+  id           String   @id @default(cuid())
+  encounterId  String
+  medication   String
+  dosage       String
+  frequency    String
+  durationDays Int
+  instructions String?
+  createdAt    DateTime @default(now())
+
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId])
+}
+
+/// Metadata only (test name, status, clinician-entered summary, file name).
+model DiagnosticReport {
+  id            String           @id @default(cuid())
+  encounterId   String
+  testName      String
+  status        DiagnosticStatus @default(ORDERED)
+  resultSummary String?
+  fileName      String?
+  orderedAt     DateTime         @default(now())
+  resultedAt    DateTime?
+
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId])
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  number          String        @unique
+  patientId       String
+  appointmentId   String?       @unique
+  encounterId     String?       @unique
+  status          InvoiceStatus @default(DRAFT)
+  subtotalCents   Int           @default(0)
+  taxCents        Int           @default(0)
+  discountCents   Int           @default(0)
+  totalCents      Int           @default(0)
+  amountPaidCents Int           @default(0)
+  notes           String?
+  issuedAt        DateTime?
+  paidAt          DateTime?
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  appointment Appointment?      @relation(fields: [appointmentId], references: [id])
+  encounter   Encounter?        @relation(fields: [encounterId], references: [id])
+  lineItems   InvoiceLineItem[]
+  payments    Payment[]
+
+  @@index([patientId, createdAt])
+  @@index([status, createdAt])
+}
+
+model InvoiceLineItem {
+  id             String       @id @default(cuid())
+  invoiceId      String
+  category       LineCategory
+  description    String
+  quantity       Int
+  unitPriceCents Int
+  /// Tax rate in basis points (1200 = 12%).
+  taxRateBps     Int          @default(0)
+  taxCents       Int
+  /// quantity * unitPriceCents + taxCents (enforced by a CHECK constraint)
+  lineTotalCents Int
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+/// Simulated (sandbox) payment. No real payment provider is called.
+model Payment {
+  id             String        @id @default(cuid())
+  invoiceId      String
+  amountCents    Int
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  providerRef    String        @unique
+  failureReason  String?
+  idempotencyKey String        @unique
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([status, createdAt])
+}
+
+/// Append-only trail of access to and changes of sensitive records.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  Role?
+  action     String
+  entityType String
+  entityId   String?
+  patientId  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([patientId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@index([action])
+}
