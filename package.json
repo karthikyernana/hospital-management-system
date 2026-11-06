@@ -15,7 +15,8 @@
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "openapi:export": "tsx scripts/export-openapi.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
