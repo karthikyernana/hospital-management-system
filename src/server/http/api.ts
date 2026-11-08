@@ -9,7 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { ZodError, type ZodType } from "zod";
+import { ZodError, type ZodType, type ZodTypeDef } from "zod";
 import { readSessionCookie, verifySession, type SessionUser } from "../auth/session";
 import { assertCan, type Permission } from "../auth/permissions";
 import { AppError, unauthenticated } from "./errors";
@@ -25,8 +25,9 @@ export interface RouteContext<B, Q> {
 
 interface RouteOptions<B, Q> {
   permission?: Permission;
-  body?: ZodType<B>;
-  query?: ZodType<Q>;
+  // Input type is `unknown`: schemas may preprocess raw form/query values.
+  body?: ZodType<B, ZodTypeDef, unknown>;
+  query?: ZodType<Q, ZodTypeDef, unknown>;
 }
 
 type NextRouteCtx = { params: Promise<Record<string, string>> };
