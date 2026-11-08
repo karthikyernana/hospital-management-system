@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/server/auth/current-user";
 import { can } from "@/server/auth/permissions";
 import { getPatient } from "@/server/services/patients";
+import { listAppointments } from "@/server/services/appointments";
+import { StatusBadge } from "@/components/status-badge";
+import Link from "next/link";
 import { AppError } from "@/server/http/errors";
-import { Alert, Badge, ButtonLink, Card, PageHeader } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, EmptyState, PageHeader, Table, Td } from "@/components/ui";
 import { ageFrom, fullName, titleCase } from "@/lib/format";
-import { formatLocalDate } from "@/lib/time";
+import { formatLocal, formatLocalDate } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Patient" };
 
@@ -19,6 +22,7 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
     if (e instanceof AppError && e.code === "NOT_FOUND") notFound();
     throw e;
   });
+  const appointments = await listAppointments(user, { patientId: p.id, scope: "all", page: 1, pageSize: 10 });
 
   const rows: [string, string | null][] = [
     ["Date of birth", `${formatLocalDate(p.dateOfBirth)} (${ageFrom(p.dateOfBirth)} y)`],
@@ -58,7 +62,24 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
             </div>
           </dl>
         </Card>
-        <div className="space-y-6 lg:col-span-2" id="patient-activity" />
+        <div className="space-y-6 lg:col-span-2">
+          <Card title="Appointments" actions={<Link className="text-sm text-teal-700 hover:underline" href={`/appointments?patientId=${p.id}&scope=all`}>View all</Link>}>
+            {appointments.items.length === 0 ? (
+              <EmptyState title="No appointments yet" />
+            ) : (
+              <Table head={["When", "Doctor", "Status", ""]} caption="Patient appointments">
+                {appointments.items.map((a) => (
+                  <tr key={a.id}>
+                    <Td className="tabular-nums">{formatLocal(a.startTime)}</Td>
+                    <Td>Dr. {a.doctor.firstName} {a.doctor.lastName}</Td>
+                    <Td><StatusBadge status={a.status} /></Td>
+                    <Td><Link className="text-teal-700 hover:underline" href={`/appointments/${a.id}`}>Open</Link></Td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Card>
+        </div>
       </div>
     </>
   );
