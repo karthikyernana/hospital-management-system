@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC_PATHS = ["/login", "/api", "/docs", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = ["/login", "/api", "/docs", "/_next", "/favicon.ico"]; // /api routes enforce auth themselves
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
