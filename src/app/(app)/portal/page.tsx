@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/server/auth/current-user";
 import { listAppointments } from "@/server/services/appointments";
 import { listVisits } from "@/server/services/visits";
+import { listInvoices } from "@/server/services/billing";
+import { formatINR } from "@/lib/money";
 import { formatLocal } from "@/lib/time";
 import { Alert, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { StatusBadge } from "@/components/status-badge";
@@ -20,6 +22,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     listAppointments(user, { scope: "past", page: 1, pageSize: 10 }),
     listVisits(user, { page: 1, pageSize: 5 }),
   ]);
+  const invoices = await listInvoices(user, { page: 1, pageSize: 10 });
   const prescriptions = visits.items.flatMap((v) => v.prescriptions.map((p) => ({ ...p, doctor: v.doctor, date: v.startedAt })));
 
   return (
@@ -61,7 +64,27 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
             </ul>
           )}
         </Card>
-        <Card title="Recent prescriptions" className="lg:col-span-2">
+        <Card title="My bills">
+          {invoices.items.length === 0 ? (
+            <EmptyState title="No bills" />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {invoices.items.map((i) => (
+                <li key={i.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                  <div>
+                    <p className="font-mono text-xs font-medium">{i.number}</p>
+                    <p className="text-slate-600">{formatINR(i.totalCents)} · paid {formatINR(i.amountPaidCents)}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={i.status} />
+                    <Link className="text-teal-700 hover:underline" href={`/portal/invoices/${i.id}`}>{i.status === "ISSUED" ? "Pay" : "View"}</Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card title="Recent prescriptions">
           {prescriptions.length === 0 ? (
             <EmptyState title="No prescriptions on record" />
           ) : (
