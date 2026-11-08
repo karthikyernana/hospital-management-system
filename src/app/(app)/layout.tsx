@@ -7,8 +7,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items = navFor(user.role).map(({ href, label }) => ({ href, label }));
   return (
     <div className="lg:flex">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:shadow">
+        Skip to content
+      </a>
       <Sidebar items={items} user={{ name: user.name, role: user.role }} />
-      <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6 focus:outline-none sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">{children}</div>
+      </main>
     </div>
   );
 }
