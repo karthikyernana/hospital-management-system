@@ -14,7 +14,8 @@
     "db:reset": "prisma migrate reset --force",
     "postinstall": "prisma generate",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -31,6 +32,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "prisma": "^6.19.3",

@@ -13,6 +13,11 @@ export default defineConfig({
     // Integration tests share one database, so files run one after another.
     fileParallelism: false,
     testTimeout: 30_000,
+    coverage: {
+      provider: "v8",
+      include: ["src/server/**", "src/lib/**"],
+      reporter: ["text-summary", "text", "html"],
+    },
     hookTimeout: 60_000,
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
